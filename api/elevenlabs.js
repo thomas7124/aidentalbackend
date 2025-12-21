@@ -2,9 +2,33 @@ export const config = {
   runtime: "nodejs",
 };
 
+/**
+ * Normalize US phone numbers to E.164 format
+ * Examples:
+ *  6572396233   -> +16572396233
+ *  (657)239-6233 -> +16572396233
+ *  +16572396233 -> +16572396233
+ */
+function toE164US(phone) {
+  if (!phone) return null;
+
+  const digits = String(phone).replace(/\D/g, "");
+
+  // Already E.164 with country code
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  // Standard US 10-digit number
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  // Invalid
+  return null;
+}
 
 export default async function handler(req, res) {
-  // Always log invocation (for debugging & confidence)
   console.log("🔥 Function invoked");
 
   if (req.method !== "POST") {
@@ -14,7 +38,6 @@ export default async function handler(req, res) {
 
   console.log("📦 Raw body:", JSON.stringify(req.body, null, 2));
 
-  // ElevenLabs sends the body directly (no wrapper)
   const {
     patient_name,
     phone_number,
@@ -37,27 +60,27 @@ export default async function handler(req, res) {
     });
   }
 
-  // Optional: emergency handling
+  // 🚨 Emergency handling
   if (is_emergency === true) {
     console.log("🚨 Emergency appointment detected");
-
-    // You can later:
-    // - notify staff
-    // - skip calendar booking
-    // - route to live call
-
     return res.status(200).json({
       status: "Emergency flagged – manual follow-up required"
     });
   }
 
-  // Convert date + time → ISO string
-  // preferred_date = YYYY-MM-DD
-  // preferred_time = HH:MM (24h)
-  const startTime = new Date(
-  `${preferred_date}T${preferred_time}:00-05:00`
-);
+  // ✅ Normalize phone number
+  const attendeePhoneNumber = toE164US(phone_number);
 
+  if (!attendeePhoneNumber) {
+    return res.status(400).json({
+      error: "Invalid phone number format. Must include area code."
+    });
+  }
+
+  // Convert date + time → ISO
+  const startTime = new Date(
+    `${preferred_date}T${preferred_time}:00-05:00`
+  );
 
   if (isNaN(startTime.getTime())) {
     return res.status(400).json({
@@ -66,49 +89,40 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Call Cal.com API
-    
     console.log(
-  "ENV CHECK:",
-  "CAL_API_KEY:", !!process.env.CAL_API_KEY,
-  "EVENT_TYPE_ID:", !!process.env.CAL_EVENT_TYPE_ID
-);
+      "ENV CHECK:",
+      "CAL_API_KEY:", !!process.env.CAL_API_KEY,
+      "EVENT_TYPE_ID:", !!process.env.CAL_EVENT_TYPE_ID
+    );
 
- console.log("CAL_API_KEY length:", process.env.CAL_API_KEY?.length);
+    console.log("CAL_API_KEY length:", process.env.CAL_API_KEY?.length);
 
-const calResponse = await fetch(
-  `https://api.cal.com/v1/bookings?apiKey=${process.env.CAL_API_KEY}`,
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-   body: JSON.stringify({
-  eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
-  start: startTime.toISOString(),
+    const calResponse = await fetch(
+      `https://api.cal.com/v1/bookings?apiKey=${process.env.CAL_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+          start: startTime.toISOString(),
 
-  timeZone: "America/New_York",   // ✅ REQUIRED
-  language: "en",                // ✅ REQUIRED
-  metadata: {},                  // ✅ REQUIRED (can be empty)
+          // ✅ REQUIRED FIELDS
+          timeZone: "America/New_York",
+          language: "en",
+          metadata: {},
 
-  responses: {
-    name: patient_name,
-    attendeePhoneNumber: phone_number,
-    notes: appointment_reason,
-    email: "noemail@yourclinic.com",
-    location: "In-person",
-
-
-    
-  },
-}),
-
-  }
-);
-
-
-
-
+          responses: {
+            name: patient_name,
+            attendeePhoneNumber, // ✅ FIXED FORMAT
+            notes: appointment_reason,
+            email: "noemail@yourclinic.com",
+            location: "In-person",
+          },
+        }),
+      }
+    );
 
     const result = await calResponse.json();
 
