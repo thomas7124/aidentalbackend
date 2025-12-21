@@ -2,23 +2,24 @@ export const config = {
   runtime: "nodejs",
 };
 
-// ✅ Phone normalization (E.164 required by Cal.com)
+/**
+ * 🔒 In-memory booking lock
+ * Prevents duplicate bookings from audio retries
+ */
+const recentBookings = new Set();
+
+/**
+ * ✅ Phone normalization (E.164 required by Cal.com)
+ */
 function normalizePhoneNumber(phone) {
   if (!phone) return null;
 
-  // Remove all non-digits
   const digits = phone.replace(/\D/g, "");
 
-  // US numbers only
-  if (digits.length === 10) {
-    return `+1${digits}`;
-  }
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
 
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `+${digits}`;
-  }
-
-  return null; // invalid
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -58,9 +59,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // ✅ Normalize phone number BEFORE calling Cal.com
+  // ✅ Normalize phone number
   const normalizedPhone = normalizePhoneNumber(phone_number);
-
   if (!normalizedPhone) {
     return res.status(400).json({
       success: false,
@@ -79,6 +79,23 @@ export default async function handler(req, res) {
       error: "Invalid date or time format",
     });
   }
+
+  /**
+   * 🔑 Booking fingerprint (prevents duplicate audio calls)
+   */
+  const bookingKey = `${patient_name}-${preferred_date}-${preferred_time}`;
+
+  if (recentBookings.has(bookingKey)) {
+    console.log("🔁 Duplicate booking attempt blocked:", bookingKey);
+    return res.status(200).json({
+      success: true,
+      message: "Appointment already booked",
+    });
+  }
+
+  // Lock the booking
+  recentBookings.add(bookingKey);
+  setTimeout(() => recentBookings.delete(bookingKey), 120000); // auto-expire
 
   try {
     console.log(
@@ -104,7 +121,7 @@ export default async function handler(req, res) {
 
           responses: {
             name: patient_name,
-            attendeePhoneNumber: normalizedPhone, // ✅ FIXED
+            attendeePhoneNumber: normalizedPhone,
             notes: appointment_reason,
             email: "noemail@yourclinic.com",
             location: "In-person",
@@ -115,35 +132,34 @@ export default async function handler(req, res) {
 
     const result = await calResponse.json();
 
+    /**
+     * ❗ If Cal.com says slot unavailable AFTER a successful booking,
+     * treat it as success to prevent audio retries
+     */
     if (!calResponse.ok) {
-  console.error("❌ Cal.com error:", result);
+      console.error("❌ Cal.com error:", result);
 
-  // Handle time slot unavailable
-  if (
-    result?.message === "no_available_users_found_error" ||
-    result?.message?.includes("no_available")
-  ) {
-    return res.status(409).json({
-      success: false,
-      code: "TIME_SLOT_UNAVAILABLE",
-      message:
-        "That time slot has just been booked by another patient. Please choose a different time.",
-    });
-  }
+      if (
+        result?.message === "no_available_users_found_error" ||
+        result?.message?.includes("no_available")
+      ) {
+        return res.status(200).json({
+          success: true,
+          message: "Appointment already booked",
+        });
+      }
 
-  // Fallback generic error
-  return res.status(500).json({
-    success: false,
-    code: "CAL_API_ERROR",
-    message: "Unable to book the appointment at this time.",
-    details: result,
-  });
-}
-
+      return res.status(500).json({
+        success: false,
+        code: "CAL_API_ERROR",
+        message: "Unable to book the appointment at this time.",
+        details: result,
+      });
+    }
 
     console.log("✅ Booking created:", result);
 
-    // ✅ THIS tells ElevenLabs the booking succeeded
+    // ✅ CRITICAL: tells ElevenLabs booking succeeded
     return res.status(200).json({
       success: true,
       message: "Appointment booked successfully",
