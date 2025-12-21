@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+  // Always log invocation (for debugging & confidence)
   console.log("🔥 Function invoked");
 
   if (req.method !== "POST") {
@@ -8,9 +9,94 @@ export default async function handler(req, res) {
 
   console.log("📦 Raw body:", JSON.stringify(req.body, null, 2));
 
-  // Accept any payload for now
-  return res.status(200).json({
-    status: "received",
-    body: req.body
-  });
+  // ElevenLabs sends the body directly (no wrapper)
+  const {
+    patient_name,
+    phone_number,
+    appointment_reason,
+    preferred_date,
+    preferred_time,
+    is_emergency = false
+  } = req.body;
+
+  // Basic validation
+  if (
+    !patient_name ||
+    !phone_number ||
+    !appointment_reason ||
+    !preferred_date ||
+    !preferred_time
+  ) {
+    return res.status(400).json({
+      error: "Missing required appointment fields"
+    });
+  }
+
+  // Optional: emergency handling
+  if (is_emergency === true) {
+    console.log("🚨 Emergency appointment detected");
+
+    // You can later:
+    // - notify staff
+    // - skip calendar booking
+    // - route to live call
+
+    return res.status(200).json({
+      status: "Emergency flagged – manual follow-up required"
+    });
+  }
+
+  // Convert date + time → ISO string
+  // preferred_date = YYYY-MM-DD
+  // preferred_time = HH:MM (24h)
+  const startTime = new Date(`${preferred_date}T${preferred_time}:00`);
+
+  if (isNaN(startTime.getTime())) {
+    return res.status(400).json({
+      error: "Invalid date or time format"
+    });
+  }
+
+  try {
+    // Call Cal.com API
+    const calResponse = await fetch("https://api.cal.com/v1/bookings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.CAL_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        eventTypeId: process.env.CAL_EVENT_TYPE_ID,
+        start: startTime.toISOString(),
+        responses: {
+          name: patient_name,
+          phone: phone_number,
+          reason: appointment_reason
+        }
+      })
+    });
+
+    const result = await calResponse.json();
+
+    if (!calResponse.ok) {
+      console.error("❌ Cal.com error:", result);
+      return res.status(500).json({
+        error: "Failed to create calendar booking",
+        details: result
+      });
+    }
+
+    console.log("✅ Booking created:", result);
+
+    return res.status(200).json({
+      status: "Appointment booked",
+      booking: result
+    });
+
+  } catch (err) {
+    console.error("❌ Unexpected error:", err);
+    return res.status(500).json({
+      error: "Internal server error"
+    });
+  }
 }
