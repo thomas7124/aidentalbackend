@@ -3,11 +3,22 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { tool, arguments: data } = req.body;
+  console.log("Incoming body:", JSON.stringify(req.body, null, 2));
+
+  const tool =
+    req.body.tool ||
+    req.body.name ||
+    "create_dental_appointment"; // assume tool if body params exist
+
+  const data = req.body.arguments || req.body;
 
   if (tool !== "create_dental_appointment") {
-    return res.status(400).json({ error: "Unknown tool" });
+    return res.status(400).json({
+      error: "Unknown tool",
+      received: tool
+    });
   }
+
 
   const {
     patient_name,
