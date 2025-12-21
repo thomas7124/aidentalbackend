@@ -49,7 +49,10 @@ export default async function handler(req, res) {
   // Convert date + time → ISO string
   // preferred_date = YYYY-MM-DD
   // preferred_time = HH:MM (24h)
-  const startTime = new Date(`${preferred_date}T${preferred_time}:00`);
+  const startTime = new Date(
+  `${preferred_date}T${preferred_time}:00-05:00`
+);
+
 
   if (isNaN(startTime.getTime())) {
     return res.status(400).json({
