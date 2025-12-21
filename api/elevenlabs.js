@@ -93,8 +93,8 @@ const calResponse = await fetch(
 
   responses: {
     name: patient_name,
-    phone: phone_number,
-    reason: appointment_reason,
+    attendeePhoneNumber: phone_number,
+    notes: appointment_reason,
     email: "noemail@yourclinic.com",
     location: "In-person",
 
