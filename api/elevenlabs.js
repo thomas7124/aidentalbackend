@@ -79,9 +79,11 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
   "Content-Type": "application/json",
+  Authorization: `Bearer ${process.env.CAL_API_KEY}`,
 },
+
 body: JSON.stringify({
-  apiKey: process.env.CAL_API_KEY,   // ✅ REQUIRED HERE
+
   eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
   start: startTime.toISOString(),
   responses: {
