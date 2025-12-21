@@ -1,4 +1,5 @@
-export const config = {
+// ✅ REQUIRED for Vercel Node.js
+module.exports.config = {
   runtime: "nodejs",
 };
 
@@ -14,14 +15,13 @@ function normalizePhoneNumber(phone) {
   return null;
 }
 
-export default async function handler(req, res) {
+module.exports.default = async function handler(req, res) {
   console.log("🔥 Function invoked");
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // 1️⃣ Extract body
   const {
     patient_name,
     phone_number,
@@ -44,7 +44,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // 🚨 Emergency shortcut
   if (is_emergency === true) {
     return res.status(200).json({
       success: true,
@@ -52,9 +51,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // 2️⃣ Normalize phone
   const normalizedPhone = normalizePhoneNumber(phone_number);
-
   if (!normalizedPhone) {
     return res.status(400).json({
       success: false,
@@ -62,21 +59,13 @@ export default async function handler(req, res) {
     });
   }
 
-  // 3️⃣ Create start time
-  const startTime = new Date(
-    `${preferred_date}T${preferred_time}:00-05:00`
-  );
-
+  const startTime = new Date(`${preferred_date}T${preferred_time}:00-05:00`);
   if (isNaN(startTime.getTime())) {
     return res.status(400).json({
       success: false,
       error: "Invalid date or time format",
     });
   }
-
-  // 4️⃣ Idempotency key (NOW safe to compute)
-  const bookingKey = `${patient_name}-${normalizedPhone}-${startTime.toISOString()}`;
-  console.log("🔐 Booking key:", bookingKey);
 
   try {
     const calResponse = await fetch(
@@ -89,8 +78,7 @@ export default async function handler(req, res) {
           start: startTime.toISOString(),
           timeZone: "America/New_York",
           language: "en",
-          metadata: { bookingKey },
-
+          metadata: {},
           responses: {
             name: patient_name,
             attendeePhoneNumber: normalizedPhone,
@@ -102,40 +90,27 @@ export default async function handler(req, res) {
       }
     );
 
-  const result = await calResponse.json();
+    const result = await calResponse.json();
 
-// ❌ Treat payload errors as failures EVEN if HTTP status is 200
-if (
-  !calResponse.ok ||
-  result?.message === "no_available_users_found_error" ||
-  result?.message?.includes("no_available") ||
-  !result?.id // 🔥 THIS is the key fix
-) {
-  console.error("❌ Cal.com booking failed:", result);
+    // 🔥 CRITICAL FIX: treat payload errors as failures
+    if (
+      !calResponse.ok ||
+      result?.message === "no_available_users_found_error" ||
+      result?.message?.includes("no_available") ||
+      !result?.id
+    ) {
+      console.error("❌ Cal.com booking failed:", result);
 
-  return res.status(409).json({
-    success: false,
-    code: "TIME_SLOT_UNAVAILABLE",
-    message:
-      "That time is no longer available. Would you like to choose a different time?",
-  });
-}
-
-// ✅ ONLY reaches here if booking ACTUALLY exists
-console.log("✅ Booking created:", result);
-
-return res.status(200).json({
-  success: true,
-  message: "Appointment booked successfully",
-  booking: result,
-});
-
-}
-
+      return res.status(409).json({
+        success: false,
+        code: "TIME_SLOT_UNAVAILABLE",
+        message:
+          "That time is no longer available. Would you like to choose a different time?",
+      });
+    }
 
     console.log("✅ Booking created:", result);
 
-    // ✅ ONLY success response ElevenLabs should trust
     return res.status(200).json({
       success: true,
       message: "Appointment booked successfully",
@@ -149,4 +124,4 @@ return res.status(200).json({
       error: "Internal server error",
     });
   }
-}
+};
