@@ -102,14 +102,14 @@ export default async function handler(req, res) {
       }
     );
 
-    const result = await calResponse.json();
+  const result = await calResponse.json();
 
-    // ❌ Booking failed — DO NOT tell the bot it succeeded
-// ❌ Cal.com sometimes returns 200 even on failure — check payload
+// ❌ Treat payload errors as failures EVEN if HTTP status is 200
 if (
   !calResponse.ok ||
   result?.message === "no_available_users_found_error" ||
-  result?.message?.includes("no_available")
+  result?.message?.includes("no_available") ||
+  !result?.id // 🔥 THIS is the key fix
 ) {
   console.error("❌ Cal.com booking failed:", result);
 
@@ -121,14 +121,15 @@ if (
   });
 }
 
+// ✅ ONLY reaches here if booking ACTUALLY exists
+console.log("✅ Booking created:", result);
 
-  // Any other Cal.com error
-  return res.status(500).json({
-    success: false,
-    code: "CAL_API_ERROR",
-    message: "Unable to book the appointment right now.",
-    details: result,
-  });
+return res.status(200).json({
+  success: true,
+  message: "Appointment booked successfully",
+  booking: result,
+});
+
 }
 
 
