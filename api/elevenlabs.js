@@ -82,14 +82,15 @@ export default async function handler(req, res) {
     "x-cal-api-key": process.env.CAL_API_KEY,
   },
   body: JSON.stringify({
-    eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
-    start: startTime.toISOString(),
-    responses: {
-      name: patient_name,
-      phone: phone_number,
-      reason: appointment_reason,
-    },
-  }),
+  apiKey: process.env.CAL_API_KEY, // 🔑 REQUIRED HERE
+  eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+  start: startTime.toISOString(),
+  responses: {
+    name: patient_name,
+    phone: phone_number,
+    reason: appointment_reason,
+  },
+}),
 });
 
 
