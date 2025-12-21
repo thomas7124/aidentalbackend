@@ -74,24 +74,26 @@ export default async function handler(req, res) {
   "EVENT_TYPE_ID:", !!process.env.CAL_EVENT_TYPE_ID
 );
 
-    
-  const calResponse = await fetch("https://api.cal.com/v1/bookings", {
+ console.log("CAL_API_KEY length:", process.env.CAL_API_KEY?.length);
+
+const calResponse = await fetch("https://api.cal.com/v1/bookings", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "x-cal-api-key": process.env.CAL_API_KEY,
+    Authorization: `Bearer ${process.env.CAL_API_KEY}`, // ✅ REQUIRED
   },
   body: JSON.stringify({
-  apiKey: process.env.CAL_API_KEY, // 🔑 REQUIRED HERE
-  eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
-  start: startTime.toISOString(),
-  responses: {
-    name: patient_name,
-    phone: phone_number,
-    reason: appointment_reason,
-  },
-}),
+    eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+    start: startTime.toISOString(),
+    responses: {
+      name: patient_name,
+      phone: phone_number,
+      reason: appointment_reason,
+    },
+  }),
 });
+
+
 
 
     const result = await calResponse.json();
