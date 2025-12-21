@@ -67,6 +67,14 @@ export default async function handler(req, res) {
 
   try {
     // Call Cal.com API
+    
+    console.log(
+  "ENV CHECK:",
+  "CAL_API_KEY:", !!process.env.CAL_API_KEY,
+  "EVENT_TYPE_ID:", !!process.env.CAL_EVENT_TYPE_ID
+);
+
+    
     const calResponse = await fetch("https://api.cal.com/v1/bookings", {
       method: "POST",
       headers: {
