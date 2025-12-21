@@ -1,3 +1,8 @@
+export const config = {
+  runtime: "nodejs",
+};
+
+
 export default async function handler(req, res) {
   // Always log invocation (for debugging & confidence)
   console.log("🔥 Function invoked");
