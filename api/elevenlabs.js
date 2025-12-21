@@ -78,18 +78,19 @@ export default async function handler(req, res) {
     const calResponse = await fetch("https://api.cal.com/v1/bookings", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.CAL_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        eventTypeId: process.env.CAL_EVENT_TYPE_ID,
-        start: startTime.toISOString(),
-        responses: {
-          name: patient_name,
-          phone: phone_number,
-          reason: appointment_reason
-        }
-      })
+  "Content-Type": "application/json",
+},
+body: JSON.stringify({
+  apiKey: process.env.CAL_API_KEY,   // ✅ REQUIRED HERE
+  eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+  start: startTime.toISOString(),
+  responses: {
+    name: patient_name,
+    phone: phone_number,
+    reason: appointment_reason,
+  },
+}),
+
     });
 
     const result = await calResponse.json();
