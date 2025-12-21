@@ -1,3 +1,5 @@
+const bookingKey = `${patient_name}-${normalizedPhone}-${startTime.toISOString()}`;
+
 export const config = {
   runtime: "nodejs",
 };
@@ -103,16 +105,19 @@ export default async function handler(req, res) {
 
       // Slot unavailable
       if (
-        result?.message === "no_available_users_found_error" ||
-        result?.message?.includes("no_available")
-      ) {
-        return res.status(409).json({
-          success: false,
-          code: "TIME_SLOT_UNAVAILABLE",
-          message:
-            "That time slot is no longer available. Please choose a different time.",
-        });
-      }
+  result?.message === "no_available_users_found_error" ||
+  result?.message?.includes("no_available")
+) {
+  // 🟡 VERY IMPORTANT:
+  // If ElevenLabs retries after a successful booking,
+  // Cal.com will reject but the appointment already exists.
+  return res.status(200).json({
+    success: true,
+    message: "Appointment already confirmed.",
+    alreadyBooked: true,
+  });
+}
+
 
       // Any other Cal.com error
       return res.status(500).json({
