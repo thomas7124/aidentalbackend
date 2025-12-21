@@ -95,6 +95,11 @@ const calResponse = await fetch(
     name: patient_name,
     phone: phone_number,
     reason: appointment_reason,
+    email: "noemail@yourclinic.com",
+    location: "In-person",
+
+
+    
   },
 }),
 
