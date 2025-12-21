@@ -116,13 +116,30 @@ export default async function handler(req, res) {
     const result = await calResponse.json();
 
     if (!calResponse.ok) {
-      console.error("❌ Cal.com error:", result);
-      return res.status(500).json({
-        success: false,
-        error: "Failed to create calendar booking",
-        details: result,
-      });
-    }
+  console.error("❌ Cal.com error:", result);
+
+  // Handle time slot unavailable
+  if (
+    result?.message === "no_available_users_found_error" ||
+    result?.message?.includes("no_available")
+  ) {
+    return res.status(409).json({
+      success: false,
+      code: "TIME_SLOT_UNAVAILABLE",
+      message:
+        "That time slot has just been booked by another patient. Please choose a different time.",
+    });
+  }
+
+  // Fallback generic error
+  return res.status(500).json({
+    success: false,
+    code: "CAL_API_ERROR",
+    message: "Unable to book the appointment at this time.",
+    details: result,
+  });
+}
+
 
     console.log("✅ Booking created:", result);
 
