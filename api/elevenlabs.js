@@ -105,21 +105,22 @@ export default async function handler(req, res) {
     const result = await calResponse.json();
 
     // ❌ Booking failed — DO NOT tell the bot it succeeded
-if (!calResponse.ok) {
-  console.error("❌ Cal.com error:", result);
+// ❌ Cal.com sometimes returns 200 even on failure — check payload
+if (
+  !calResponse.ok ||
+  result?.message === "no_available_users_found_error" ||
+  result?.message?.includes("no_available")
+) {
+  console.error("❌ Cal.com booking failed:", result);
 
-  // Time slot unavailable
-  if (
-    result?.message === "no_available_users_found_error" ||
-    result?.message?.includes("no_available")
-  ) {
-    return res.status(409).json({
-      success: false,
-      code: "TIME_SLOT_UNAVAILABLE",
-      message:
-        "That time is no longer available. Would you like to choose a different time?",
-    });
-  }
+  return res.status(409).json({
+    success: false,
+    code: "TIME_SLOT_UNAVAILABLE",
+    message:
+      "That time is no longer available. Would you like to choose a different time?",
+  });
+}
+
 
   // Any other Cal.com error
   return res.status(500).json({
