@@ -104,28 +104,32 @@ export default async function handler(req, res) {
 
     const result = await calResponse.json();
 
-    // ❌ Cal.com rejected
-    if (!calResponse.ok) {
-      console.error("❌ Cal.com error:", result);
+    // ❌ Booking failed — DO NOT tell the bot it succeeded
+if (!calResponse.ok) {
+  console.error("❌ Cal.com error:", result);
 
-      // 🟡 Retry-safe handling (audio double call)
-      if (
-        result?.message === "no_available_users_found_error" ||
-        result?.message?.includes("no_available")
-      ) {
-        return res.status(200).json({
-          success: true,
-          alreadyBooked: true,
-          message: "Appointment already confirmed.",
-        });
-      }
+  // Time slot unavailable
+  if (
+    result?.message === "no_available_users_found_error" ||
+    result?.message?.includes("no_available")
+  ) {
+    return res.status(409).json({
+      success: false,
+      code: "TIME_SLOT_UNAVAILABLE",
+      message:
+        "That time is no longer available. Would you like to choose a different time?",
+    });
+  }
 
-      return res.status(500).json({
-        success: false,
-        error: "Unable to book appointment",
-        details: result,
-      });
-    }
+  // Any other Cal.com error
+  return res.status(500).json({
+    success: false,
+    code: "CAL_API_ERROR",
+    message: "Unable to book the appointment right now.",
+    details: result,
+  });
+}
+
 
     console.log("✅ Booking created:", result);
 
