@@ -2,6 +2,25 @@ export const config = {
   runtime: "nodejs",
 };
 
+// ✅ Phone normalization (E.164 required by Cal.com)
+function normalizePhoneNumber(phone) {
+  if (!phone) return null;
+
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, "");
+
+  // US numbers only
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+${digits}`;
+  }
+
+  return null; // invalid
+}
+
 export default async function handler(req, res) {
   console.log("🔥 Function invoked");
 
@@ -26,10 +45,12 @@ export default async function handler(req, res) {
     !preferred_time
   ) {
     return res.status(400).json({
+      success: false,
       error: "Missing required appointment fields",
     });
   }
 
+  // 🚨 Emergency handling
   if (is_emergency === true) {
     return res.status(200).json({
       success: true,
@@ -37,12 +58,24 @@ export default async function handler(req, res) {
     });
   }
 
+  // ✅ Normalize phone number BEFORE calling Cal.com
+  const normalizedPhone = normalizePhoneNumber(phone_number);
+
+  if (!normalizedPhone) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid phone number format",
+    });
+  }
+
+  // Convert date + time → ISO
   const startTime = new Date(
     `${preferred_date}T${preferred_time}:00-05:00`
   );
 
   if (isNaN(startTime.getTime())) {
     return res.status(400).json({
+      success: false,
       error: "Invalid date or time format",
     });
   }
@@ -71,7 +104,7 @@ export default async function handler(req, res) {
 
           responses: {
             name: patient_name,
-            attendeePhoneNumber: phone_number,
+            attendeePhoneNumber: normalizedPhone, // ✅ FIXED
             notes: appointment_reason,
             email: "noemail@yourclinic.com",
             location: "In-person",
@@ -93,7 +126,7 @@ export default async function handler(req, res) {
 
     console.log("✅ Booking created:", result);
 
-    // 🔴 THIS RETURN IS THE MOST IMPORTANT LINE 🔴
+    // ✅ THIS tells ElevenLabs the booking succeeded
     return res.status(200).json({
       success: true,
       message: "Appointment booked successfully",
