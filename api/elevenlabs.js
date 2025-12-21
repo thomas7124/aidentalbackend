@@ -1,5 +1,3 @@
-const bookingKey = `${patient_name}-${normalizedPhone}-${startTime.toISOString()}`;
-
 export const config = {
   runtime: "nodejs",
 };
@@ -7,9 +5,12 @@ export const config = {
 // ✅ Phone normalization (E.164 required by Cal.com)
 function normalizePhoneNumber(phone) {
   if (!phone) return null;
+
   const digits = phone.replace(/\D/g, "");
+
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+
   return null;
 }
 
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // 1️⃣ Extract body
   const {
     patient_name,
     phone_number,
@@ -42,6 +44,7 @@ export default async function handler(req, res) {
     });
   }
 
+  // 🚨 Emergency shortcut
   if (is_emergency === true) {
     return res.status(200).json({
       success: true,
@@ -49,7 +52,9 @@ export default async function handler(req, res) {
     });
   }
 
+  // 2️⃣ Normalize phone
   const normalizedPhone = normalizePhoneNumber(phone_number);
+
   if (!normalizedPhone) {
     return res.status(400).json({
       success: false,
@@ -57,6 +62,7 @@ export default async function handler(req, res) {
     });
   }
 
+  // 3️⃣ Create start time
   const startTime = new Date(
     `${preferred_date}T${preferred_time}:00-05:00`
   );
@@ -68,13 +74,11 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    console.log(
-      "ENV CHECK:",
-      "CAL_API_KEY:", !!process.env.CAL_API_KEY,
-      "EVENT_TYPE_ID:", !!process.env.CAL_EVENT_TYPE_ID
-    );
+  // 4️⃣ Idempotency key (NOW safe to compute)
+  const bookingKey = `${patient_name}-${normalizedPhone}-${startTime.toISOString()}`;
+  console.log("🔐 Booking key:", bookingKey);
 
+  try {
     const calResponse = await fetch(
       `https://api.cal.com/v1/bookings?apiKey=${process.env.CAL_API_KEY}`,
       {
@@ -85,7 +89,8 @@ export default async function handler(req, res) {
           start: startTime.toISOString(),
           timeZone: "America/New_York",
           language: "en",
-          metadata: {},
+          metadata: { bookingKey },
+
           responses: {
             name: patient_name,
             attendeePhoneNumber: normalizedPhone,
@@ -99,38 +104,32 @@ export default async function handler(req, res) {
 
     const result = await calResponse.json();
 
-    // ❌ HARD FAILS — DO NOT MASK THESE
+    // ❌ Cal.com rejected
     if (!calResponse.ok) {
       console.error("❌ Cal.com error:", result);
 
-      // Slot unavailable
+      // 🟡 Retry-safe handling (audio double call)
       if (
-  result?.message === "no_available_users_found_error" ||
-  result?.message?.includes("no_available")
-) {
-  // 🟡 VERY IMPORTANT:
-  // If ElevenLabs retries after a successful booking,
-  // Cal.com will reject but the appointment already exists.
-  return res.status(200).json({
-    success: true,
-    message: "Appointment already confirmed.",
-    alreadyBooked: true,
-  });
-}
+        result?.message === "no_available_users_found_error" ||
+        result?.message?.includes("no_available")
+      ) {
+        return res.status(200).json({
+          success: true,
+          alreadyBooked: true,
+          message: "Appointment already confirmed.",
+        });
+      }
 
-
-      // Any other Cal.com error
       return res.status(500).json({
         success: false,
-        code: "CAL_API_ERROR",
-        message: "Unable to book the appointment at this time.",
+        error: "Unable to book appointment",
         details: result,
       });
     }
 
-    // ✅ ONLY HERE IS SUCCESS
     console.log("✅ Booking created:", result);
 
+    // ✅ ONLY success response ElevenLabs should trust
     return res.status(200).json({
       success: true,
       message: "Appointment booked successfully",
