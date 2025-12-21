@@ -83,15 +83,21 @@ const calResponse = await fetch(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
-      start: startTime.toISOString(),
-      responses: {
-        name: patient_name,
-        phone: phone_number,
-        reason: appointment_reason,
-      },
-    }),
+   body: JSON.stringify({
+  eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+  start: startTime.toISOString(),
+
+  timeZone: "America/New_York",   // ✅ REQUIRED
+  language: "en",                // ✅ REQUIRED
+  metadata: {},                  // ✅ REQUIRED (can be empty)
+
+  responses: {
+    name: patient_name,
+    phone: phone_number,
+    reason: appointment_reason,
+  },
+}),
+
   }
 );
 
