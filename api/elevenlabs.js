@@ -60,13 +60,14 @@ module.exports.default = async function handler(req, res) {
     });
   }
 
-  const normalizedPhone = normalizePhoneNumber(phone_number);
-  if (!normalizedPhone) {
-    return res.status(400).json({
-      success: false,
-      error: "Invalid phone number format",
-    });
-  }
+ const formattedPhone = formatPhoneXXX(phone_number);
+  if (!formattedPhone) {
+  return res.status(400).json({
+    success: false,
+    error: "Invalid phone number format",
+  });
+}
+
 
   const startTime = new Date(`${preferred_date}T${preferred_time}:00-05:00`);
   if (isNaN(startTime.getTime())) {
