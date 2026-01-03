@@ -106,7 +106,7 @@ if (!formattedPhone) {
         notes: appointment_reason,
 
         // ✅ STEP 4 GOES HERE
-        smsReminderNumber: formattedPhone,
+        attendeePhoneNumber: formattedPhone,
         location: {
           value: "userPhone",
           optionValue: formattedPhone,
