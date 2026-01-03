@@ -3,14 +3,13 @@ module.exports.config = {
   runtime: "nodejs",
 };
 
-// ✅ Normalize phone number to XXX-XXX-XXXX
-function formatPhoneXXX(phone) {
+// ✅ Normalize phone number to E.164: +1XXXXXXXXXX
+function formatPhoneE164(phone) {
   if (!phone) return null;
 
-  // Remove everything except digits
-  const digits = phone.replace(/\D/g, "");
+  const digits = String(phone).replace(/\D/g, "");
 
-  // Support US numbers only
+  // US / Canada only
   const normalized =
     digits.length === 10
       ? digits
@@ -20,8 +19,9 @@ function formatPhoneXXX(phone) {
 
   if (!normalized) return null;
 
-  return `${normalized.slice(0, 3)}-${normalized.slice(3, 6)}-${normalized.slice(6)}`;
+  return `+1${normalized}`;
 }
+
 
 
 module.exports.default = async function handler(req, res) {
@@ -60,7 +60,7 @@ module.exports.default = async function handler(req, res) {
     });
   }
 
- const formattedPhone = formatPhoneXXX(phone_number);
+ const formattedPhone = formatPhoneE164(phone_number);
   if (!formattedPhone) {
   return res.status(400).json({
     success: false,
@@ -79,25 +79,31 @@ module.exports.default = async function handler(req, res) {
 
   try {
     const calResponse = await fetch(
-      `https://api.cal.com/v1/bookings?apiKey=${process.env.CAL_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
-          start: startTime.toISOString(),
-          timeZone: "America/New_York",
-          language: "en",
-          metadata: {},
-          responses: {
-            name: patient_name,
-            attendeePhoneNumber: formattedPhone,
-            notes: appointment_reason,
-            email: "noemail@yourclinic.com",
-            location: "In-person",
-          },
-        }),
-      }
+  `https://api.cal.com/v1/bookings?apiKey=${process.env.CAL_API_KEY}`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      eventTypeId: Number(process.env.CAL_EVENT_TYPE_ID),
+      start: startTime.toISOString(),
+      timeZone: "America/New_York",
+      language: "en",
+      metadata: {},
+      responses: {
+        name: patient_name,
+        email: "noemail@yourclinic.com",
+        notes: appointment_reason,
+
+        // ✅ STEP 4 GOES HERE
+        smsReminderNumber: formattedPhone,
+        location: {
+          value: "userPhone",
+          optionValue: formattedPhone,
+        },
+      },
+    }),
+  }
+);
     );
 
     const result = await calResponse.json();
