@@ -3,24 +3,31 @@ module.exports.config = {
   runtime: "nodejs",
 };
 
-// ✅ Normalize phone number to E.164: +1XXXXXXXXXX
+// ✅ Normalize phone to E.164 (+1XXXXXXXXXX), US/Canada only
 function formatPhoneE164(phone) {
   if (!phone) return null;
 
+  // Convert to string and remove everything except digits
   const digits = String(phone).replace(/\D/g, "");
 
-  // US / Canada only
-  const normalized =
-    digits.length === 10
-      ? digits
-      : digits.length === 11 && digits.startsWith("1")
-      ? digits.slice(1)
-      : null;
+  // Handle common cases:
+  // 10 digits: XXXXXXXXXX
+  // 11 digits starting with 1: 1XXXXXXXXXX
+  let ten;
+  if (digits.length === 10) {
+    ten = digits;
+  } else if (digits.length === 11 && digits.startsWith("1")) {
+    ten = digits.slice(1);
+  } else {
+    return null;
+  }
 
-  if (!normalized) return null;
+  // Optional: basic sanity checks (avoid 000/111 junk)
+  // if (ten.startsWith("000")) return null;
 
-  return `+1${normalized}`;
+  return `+1${ten}`;
 }
+
 
 
 
@@ -60,13 +67,17 @@ module.exports.default = async function handler(req, res) {
     });
   }
 
- const formattedPhone = formatPhoneE164(phone_number);
-  if (!formattedPhone) {
+const formattedPhone = formatPhoneE164(phone_number);
+
+if (!formattedPhone) {
   return res.status(400).json({
     success: false,
-    error: "Invalid phone number format",
+    code: "INVALID_PHONE",
+    message:
+      "I couldn’t understand that phone number. Please say your 10-digit phone number including area code.",
   });
 }
+
 
 
   const startTime = new Date(`${preferred_date}T${preferred_time}:00-05:00`);
