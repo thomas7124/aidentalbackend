@@ -115,7 +115,7 @@ if (!formattedPhone) {
     }),
   }
 );
-    );
+    
 
     const result = await calResponse.json();
 
