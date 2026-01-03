@@ -3,17 +3,26 @@ module.exports.config = {
   runtime: "nodejs",
 };
 
-// ✅ Phone normalization (E.164 required by Cal.com)
-function normalizePhoneNumber(phone) {
+// ✅ Normalize phone number to XXX-XXX-XXXX
+function formatPhoneXXX(phone) {
   if (!phone) return null;
 
+  // Remove everything except digits
   const digits = phone.replace(/\D/g, "");
 
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  // Support US numbers only
+  const normalized =
+    digits.length === 10
+      ? digits
+      : digits.length === 11 && digits.startsWith("1")
+      ? digits.slice(1)
+      : null;
 
-  return null;
+  if (!normalized) return null;
+
+  return `${normalized.slice(0, 3)}-${normalized.slice(3, 6)}-${normalized.slice(6)}`;
 }
+
 
 module.exports.default = async function handler(req, res) {
   console.log("🔥 Function invoked");
@@ -81,7 +90,7 @@ module.exports.default = async function handler(req, res) {
           metadata: {},
           responses: {
             name: patient_name,
-            attendeePhoneNumber: normalizedPhone,
+            attendeePhoneNumber: formattedPhone,
             notes: appointment_reason,
             email: "noemail@yourclinic.com",
             location: "In-person",
